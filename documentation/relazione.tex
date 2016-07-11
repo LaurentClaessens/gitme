@@ -1,0 +1,328 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage{latexsym}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+
+\usepackage{color}
+\usepackage{hyperref}
+\hypersetup{ colorlinks=true, linkcolor=blue, urlcolor=green,    filecolor=magenta }
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+\usepackage{listingsutf8}
+
+\usepackage{textcomp}
+\usepackage{lmodern}
+\usepackage[a4paper,margin=1.5cm]{geometry} 
+\usepackage[italian]{babel}
+
+
+
+\definecolor{dkgreen}{rgb}{0,0.4,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{ %
+  inputencoding=utf8/latin1,
+  backgroundcolor=\color{white},  
+  basicstyle=\ttfamily, 
+  breakatwhitespace=false,        
+  breaklines=true,                
+  captionpos=b,                   
+  commentstyle=\small\color{dkgreen},   
+  frame=single,                   
+  keywordstyle=\small\color{blue},      
+  language=C++,                
+  fontadjust=false,
+  numbers=left,                   
+  numbersep=5pt,                  
+  numberstyle=\tiny\color{gray},  
+  rulecolor=\color{black},        
+  showspaces=false,               
+  showstringspaces=false,         
+  showtabs=false,                 
+  stepnumber=1,                   
+  stringstyle=\small\color{mauve},      
+  tabsize=2,                      
+  prebreak = \raisebox{0ex}[0ex][0ex]{\ensuremath{\hookleftarrow}}, 
+  aboveskip={1.5\baselineskip},
+}
+\newcounter{numtho}
+\newtheorem{remark}[numtho]{Nota}
+\newcommand{\info}[1]{\texttt{#1}}
+
+\begin{document}
+
+\title{Relazione di progetto\\Lora}
+\author{Laurent Claessens}
+\maketitle
+
+\tableofcontents
+
+%+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+\section{Scopo et descrizione generale del progetto}
+%+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+%--------------------------------------------------------------------------------------------------------------------------- 
+\subsection{Cosa fa ?}
+%---------------------------------------------------------------------------------------------------------------------------
+
+Lora è un programmo che fa due cose.
+\begin{itemize}
+    \item
+        Fa un backup della cartella \info{\$HOME}
+    \item
+        Cerca le cartelle che sono \emph{git repository}, verifica se hanno bisogno di un \info{git add}, \info{git commit} oppure di aggiungere dei file dentro \info{.gitignore}. Un interfaccia grafica aiuta a questo tipo di manutenzione.
+\end{itemize}
+Questo documento descrive alcuni algoritmi e strutture di dati usati; per la compilazione et l'uso, vedere il manuale del'utente \info{manual.pdf} (in inglese).
+
+%--------------------------------------------------------------------------------------------------------------------------- 
+\subsection{L'algoritmo di backup}
+%---------------------------------------------------------------------------------------------------------------------------
+
+Il programma si invoca con \info{./lora}
+
+In questo esempio, supponiamo fare il backup di \info{<home>} (che sarà usualmente la cartella \info{\$HOME}) dentro la cartella \info{<backup>} (che sarà su un disco esterno\footnote{Che dovrebbe essere cifrato, però è un altra storia.}). Di più abbiamo bisogno di una cartelle \info{<purge>} accanto a \info{<backup>}.
+
+Lora fa un \emph{loop} su tutti i file di \info{\$HOME}.
+
+\begin{enumerate}
+    \item
+        Se \info{<home>/foo/bar.txt} è diverso\footnote{L'attributo \emph{size} o \emph{last write time} è diverso.}  da \info{<backup>/foo/bar.txt}. 
+        \begin{itemize}
+            \item Sposta \info{<backup>/foo/bar.txt} verso \info{<purge>/foo/bar.txt} Quindi non ci sarà mai una perdita di dati : Lora è più di un programma di sincronizzazione. Lora fa la sincronizzazione di \info{<home>} con \info{<backup>}, ma tiene i viechi files in \info{<purge>}.
+            \item Copia \info{<home>/foo/bar.txt} su \info{<backup>/foo/bar.txt}
+        \end{itemize}
+    \item
+        Se \info{<home>/foo/bar.txt} esiste ma \info{<backup>/foo/bar.txt} non esista.
+        \begin{itemize}
+            \item Copia.
+        \end{itemize}
+\end{enumerate}
+
+Vantaggio di Lora su altri programmi di backup\footnote{Soprattutto quelli che implementano un backup incrementale.} : i dati si ritrovano con una semplice copia di \info{<backup>} su \info{<home>}. L'utente non ha bisogno si Lora per ritrovare i dati. 
+
+In particolare, l'utente può ritrovare i sui dati anche da una chiave USB minimale senza interfaccia grafica. 
+
+%--------------------------------------------------------------------------------------------------------------------------- 
+\subsection{L'algoritmo di purge}
+%---------------------------------------------------------------------------------------------------------------------------
+
+Quando il backup è finito, Lora fa un \emph{loop} su la cartella \info{<backup>}.
+
+Se \info{<backup>/foo/bar.txt} esista ma \info{<home>/foo/bar.txt} non esista, Lora pensa che l'utente abbia eliminato questo file.
+\begin{itemize}
+    \item 
+        Sposta \info{<backup>/foo/bar.txt} verso \info{<purge>/foo/bar.txt}.
+\end{itemize}
+
+Nota bene. La cartelle \info{<purge>} di cui si parla adesso non è esattamente la stessa della \info{<purge>} du cui si parlava nella descrizione del'backup. In realtà, ogni volta che Lora viene eseguito, una nuova cartella è creata : 
+
+\begin{center}
+    \info{<purge>/<date>/<hour-minutes>}
+\end{center}
+Dentro questa cartelle, Lora crea due sotto-cartelle :
+\begin{itemize}
+    \item 
+        \info{modified}  che contiene i files che sono stati modificati tra il eseguito precedente di Lora e oggi. Questa cartella si riempi durante il backup.
+\item
+    \info{removed} che contiene i files che sono stati cancellati tra il eseguito precedente di Lora e oggi. Questa cartelle si riempi durante la fase di purge.
+\end{itemize}
+
+%--------------------------------------------------------------------------------------------------------------------------- 
+\subsection{I dati prima di tutto}
+%---------------------------------------------------------------------------------------------------------------------------
+
+Questo programmo è destinato al ``power user'' : l'utente dovrebbe guardate (un po) coda succede dentro il terminale per tenersi al corrente di cosa succede sul suo disco. Per esempio, vedere \( 2000\) files passare dalla purge significa probabilmente che l'utente abbia soppresso una cartella.
+
+Lora contiene ancora un certo numero di casi in cui va in \emph{crash}. Per esempio quando un file è cancellato dal utente tra il momento in cui è visto come ``da aggiornare dentro \info{<backup>}'' e il momento in cui la copia è effettivamente fatta\footnote{Mi capita spesso con dei file ausiliari di \LaTeX\ quando faccio una compilazione nello stesso tempo di un backup.}.
+
+In questi casi, Lora preferisce lasciare al l'utente la responsabilità di capire cos'ha fatto con i suoi dati piuttosto che prendere un iniziativa. Quindi \emph{crash} piuttosto che gestione.
+
+Ci sono dunque un bel po di eccezione di tipo \info{std::string} che sono sollevate e gestite solo alla fine del'\info{main}, sotto la forma di stampa semplice.
+
+In ogni casi, se succede qualcosa di strano con i dati, l'utente deve essere avvertito. Fina ora, l'utente è avvertito sotto la forma d'un \emph{crash}. C'è però una proposta dentro \info{TODO.txt} di usare il sistema di log (vedere \info{Logging.cpp}) per scrivere i problemi dentro un file e stampare il file alla fine del'esecuzione.
+
+%-------------------------------------------------------------------------------------------------------------------------- 
+\subsection{Multi-thread}
+%---------------------------------------------------------------------------------------------------------------------------
+
+Il backup stesso occupa 2 threads.
+\begin{itemize}
+    \item Il primo è un \emph{loop} sulla cartella \info{\$HOME} che va alla ricerca di files o cartelle di cui aggiogare il backup. Questo thread aggiunge delle \emph{tasks} (vedere \ref{SECooVDGXooHTFdPE}) a una lista.
+    \item Il secondo thread legge la lista e esegue le copie da fare.
+\end{itemize}
+Questi threads non hanno interfaccia grafica, e questo è una scelta di design : devo poter fare un backup anche (e soprattutto) quando il computer va male. Per esempio voglio poter fare il backup da une chiave USB minimale\footnote{Dal punto di vista del codice, il backup è abbastanza ben separato delle dipendenze su Qt. Dovrei scrivere un giorno una versione che si può veramente eseguire fuori del'interfacia grafica.}.
+
+Nello stesso tempo, un elenco dei \emph{git repository} che hanno bisogno di pulizia si aggiorna in un interfaccia grafica.
+
+Per queste ragione, i processi sono lanciate e chiuse in questo modo (vedere \info{lora.cpp}):
+\lstinputlisting{cpp_snip_1.cpp}
+
+\begin{itemize}
+    \item Leggere il file di configurazione.
+    \item Creare e mostrare l'interfaccia grafica che elenca i \emph{git repository} (\info{GitListWindow}).
+    \item Lanciare il thread che legge l'elenco dei task da fare e esegue le task (\info{task\_runner}). A l'inizio, l'elenco è vuota, ovviamente.
+    \item Lanciare il backup e la purge (\info{loops}), quindi iniziare a popolare l'elenco delle task da fare.
+    \item Aspettare che tutte le task siano finite (\info{task\_runner.join()}).
+    \item Aspettare che l'interfaccia grafica sia chiusa (\info{git\_list\_windows->join()}).
+\end{itemize}
+
+%--------------------------------------------------------------------------------------------------------------------------- 
+\subsection{Perché è cosi grosso ?}
+%---------------------------------------------------------------------------------------------------------------------------
+
+Avevo cominciato il lavoro al'inizio di Ottobre 2015 perché avevo bisogno di un programmo di backup per uso personale. La parte di backup era già quasi finita quando abbiamo a parlare del progetto in classe.
+
+Quindi per il progetto stesso, ho aggiunto la parte ``git'' e l'interfaccia grafica.
+
+Di più, questo è un vero programmo che uso veramente per gestire i miei preziosi dati; quindi preferisco avere qualcosa che abbia le funzionalità utile. Storia interessante : avevo già fatto lo stesso programmo molti anni fa\footnote{Le scelte di design sono basate su dei casi di uso reali.} in Python (senza interfaccia grafica). Per finire il lavoro, gli serviva a volte più di trenta minuti. Lora finisce raramente in più di 6 minuti.
+
+%+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+\section{Una classe come una lista : \info{HashTable}}
+%+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+La \info{HashTable} è descritta dentro il file \info{HashTable.h}.
+
+%--------------------------------------------------------------------------------------------------------------------------- 
+\subsection{Presentazione}
+%---------------------------------------------------------------------------------------------------------------------------
+
+Il tipo \info{HashTable} si presenta come un dizionario\footnote{Assomiglia a \info{dict} di Python.} ordinato. È templatizato con uno parametro di tipo \info{K} per le chiave e un parametro di tipo \info{V} per i valori. Un uso tipico sarebbe
+
+\lstinputlisting{cpp_snip_8.cpp}
+
+Questo dizionario è ordinato perché possiamo fare un \emph{loop} per cui l'ordine è quello di dichiarazione.
+
+\lstinputlisting{cpp_snip_9.cpp}
+
+%--------------------------------------------------------------------------------------------------------------------------- 
+\subsection{Uso}
+%---------------------------------------------------------------------------------------------------------------------------
+
+La \info{HashTable} è usata parecchie volte. Per esempio la funzione che legge il file di configurazione\footnote{Vedere \info{Configuration.cpp}.} ha il prototipo
+
+\lstinputlisting{cpp_snip_10.cpp}
+
+Il file di configurazione (vedere \info{example.cfg}) è costituito di righe della forma \info{<property>=<value>}. La \info{HashTable} ritornata contiene per ogni proprietà un vettore di string che contiene le valore date.
+
+Per esempio se il file di configurazione contiene le righe
+\begin{verbatim}
+foo=bla
+bar=blo
+foo=bli
+\end{verbatim}
+la hash table ritornata satisfera 
+
+\lstinputlisting{cpp_snip_11.cpp}
+
+%+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+\section{Gerarchia polimorfa : \info{GenericTask}}
+%+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+\label{SECooVDGXooHTFdPE}
+
+Il thread \info{MainLoop} va alla ricerca di files o cartelle da copiare o spostare. Quando ne trova uno, crea una \info{task}, la mette dentro una \info{TaskList} e poi continua a cercare.
+
+C'è un altro thread che legge la \info{TaskList} per eseguire le task. C'è dunque una classe base \info{GenericTask} virtuale e delle classe derivate\footnote{Sono definite dentro il file \info{tasks.cpp} and \info{tasks.h}.} :
+
+\begin{description}
+    \item[\info{FileCopyTask}] ha il compito di fare la copia di un file. 
+    \item[\info{FileMoveTask}] ha il compito di spostare un file.
+    \item[\info{DirectoryMoveTask}] ha il compito di spostare una cartella.
+    \item[\info{FinalTask}] è speciale : indica che non ci saranno più tasks dopo. Questa task viene creata dopo aver finito il processo di 'purge'.
+\end{description}
+
+Tutte queste classe hanno una funziona \info{run} (che è virtuale dentro la base). Questa funzione fa il lavoro di copia o di spostamento. Tutte eseguano une serie di \info{assert} per essere sicuri (per esempio) di non scrivere dentro la \info{\$HOME} o dell'esistenzia dei file che devono essere copiati\footnote{Se, passando sul file \info{f}, il \emph{loop} e crea una task di copia, per colpa del multithreading, quando questa task viene eseguito, il file \info{f} potrebbe non più esistere. Succede ogni tanto con dei file temporanei di KDE.}.
+
+La funzione \info{run} deve ritornare un \info{bool}. Ritornano tutte \info{true} tranne di \info{FinalTask} che ritorna \info{false}. Lo scopo è di sapere se il \emph{thread} \info{task\_runner} può fermarsi.
+
+Ecco la funzione (un po semplificata) eseguita dal \emph{thread} \info{task\_runner} :
+
+\lstinputlisting{cpp_snip_3.cpp}
+
+Il booleano \info{still} dice se deve aspettarsi a avere nuove task nel futuro. L'unica \emph{task} a ritornare \info{false} è la \info{FinalTask}.
+
+Diamo come esempio il \info{run()} di \info{DirectoryMoveTask} (che si basa su Boost) :
+
+\lstinputlisting{cpp_snip_2.cpp}
+
+Ci sono delle \info{assert} che verificano che va tutto bene\footnote{Sono tutte già state verificate almeno una volta nel corso dello sviluppo.}. La funzione \info{create\_directory\_tree} crea tutto l'albero delle cartelle necessarie a l'esistenza della cartella data in argomento. La funzione \info{rename} (di Boost) ha un nome che dice la sua funzionalità.
+
+La funzione \info{DirectoryMovetask::run} ritorna \info{true}.
+
+%+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+\section{Gerarchia polimorfa : \info{MainLoop}}
+%+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+%--------------------------------------------------------------------------------------------------------------------------- 
+\subsection{L'algoritmo}
+%---------------------------------------------------------------------------------------------------------------------------
+
+Ecco la funzione che permette di passare in rivista tutte le sotto-cartelle e files di una cartella\footnote{Per la facilità di lettura ho tolto delle \info{assert} a altre cose che non sono importante per la comprensione del'algoritmo.} :
+
+\lstinputlisting{cpp_snip_4.cpp}
+
+La funzione \info{DealWithFile} vede se c'è qualcosa da fare con il file e crea le \emph{task} che servono.
+
+La funzione \info{DealWithDirectory} vede se c'è qualcosa da fare con la cartella e crea le \emph{task} che servono. Poi, \info{DealWithDirectory} lancia (ricorsivamente) \info{LoopOverDirectory} sulla cartella data in argomento.
+
+%--------------------------------------------------------------------------------------------------------------------------- 
+\subsection{La gerarchia}
+%---------------------------------------------------------------------------------------------------------------------------
+
+Tutta questa storia deve essere fatta due volte : una volta per il backup (copia di \info{<home>} verso \info{<backup>}) e una volta per la purge (spostamento di \info{<backup>} verso \info{<purge>}).
+
+Quindi\footnote{Vedere \info{MainLoop.cpp} and \info{MainLoop.h}} ho una classe base \info{MainLoop} che contiene le funzione virtuale pure \info{DealWithDirectory} e \info{DealWithFile}. E due classe derivate :
+
+\begin{description}
+    \item[\info{MainBackupLoop}] in cui le funzione \info{DealWithDirectory} e \info{DealWithFile} fanno delle comparazione tra \info{<home>} e \info{<backup>} per trovare i file nuovi o modificati.
+    \item[\info{MainPurgeLoop}] in cui le funzione \info{DealWithDirectory} e \info{DealWithFile} fanno delle comparazione tra \info{<home>} e \info{<backup>} per trovare i file cancellati (quelli che esistono dentro \info{<bacup>} ma che non esistono dentro \info{<home>}).
+\end{description}
+
+Queste classe derivate entrano benissimo dentro la mia classe \info{HashTable} come si vede dentro la funzione eseguita del \emph{thread} principale :
+
+\lstinputlisting{cpp_snip_5.cpp}
+
+Con chiamata polimorfa alla funzione virtuale puro \info{run} (di cui il lavoro è di chiamare \info{LoopOverDirectory} sulla cartella principale).
+
+\begin{remark}
+    Il comportamento del distruttore di \info{HashTable} è di distruggre anche i valori dei nodi. Quindi a l'uscita della funziona \info{loops}, gli oggetti \info{MainBackupLoop} e \info{MainPurgeLoop} sono distrutti.
+\end{remark}
+
+ %+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+ \section{A proposito di C++11}
+ %+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Questo progetto è stato scritto con la version GCC \( 5.2.1\) su Linux Ubuntu Wily. Fino allo \emph{commit} \info{119e4ea02fdf08490c39bf11875f94fb0eea8ddf}, usavo delle funzionalità di C++11 che ho tolto dentro la \emph{branch} ``project''.
+
+I tre principali problemi sono :
+\begin{enumerate}
+    \item
+        Il \info{for}. Usavo un sacco di strutture nel genere di
+
+\lstinputlisting{cpp_snip_6.cpp}
+
+\item \info{std::to\_string} che serve a convertire da \info{int} a \info{string}. Ho ripreso una funzione proposta su \href{  http://stackoverflow.com/questions/5590381/easiest-way-to-convert-int-to-string-in-c}{ stackoverflow } :
+
+\lstinputlisting{cpp_snip_7.cpp}
+
+\item
+    \info{std::function<void()>} che permette di passare una funzione come argomento di un altra funzione. Serviva a \info{UnitTest.cpp} (vedere \info{testing.cpp}). Non ho trovato come fare senza; quindi i testi non sono dentro il progetto (ma sono interessanti da leggere perché ci sono esempi di uso di \info{HashTable}).
+
+\end{enumerate}
+
+La branch \info{master}, disponibile su Github\footnote{\url{https://github.com/LaurentClaessens/lora}} compila con \info{-std=c++11} e sarà l'unica supportata sul lungo termine.
+
+%+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+\section{Complemento : la TODO}
+%+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Come complemento : ecco la TODO list.
+
+\verbatiminput{smallTODO.txt}
+
+\end{document}
