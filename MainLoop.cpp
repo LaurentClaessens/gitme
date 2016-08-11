@@ -48,9 +48,11 @@ void MainLoop::loopOverDirectory(path directory)
         {
             config_ptr->writeLog("I do not deal with symlink : "+ pathname.string());
         }
+        else if (is_regular_file( pathname )) {}
         else if (is_directory( pathname )) { DealWithDirectory(pathname); }
         else
         {
+            std::cout<<"pathname "<<pathname.string()<<std::endl;
             config_ptr->writeLog("I'm looping in the directory : "+directory.string());
             string message="I'm looping in the directory : "+directory.string();
             config_ptr->writeLog(message);
@@ -58,7 +60,6 @@ void MainLoop::loopOverDirectory(path directory)
         }
     }
 }
-
 
 const path MainLoop::getStartingPath() const
 {
@@ -72,13 +73,17 @@ bool MainLoop::is_excluded(path dirname)
 
 void MainLoop::DealWithDirectory(path rep_path)
 {
-    GitRepository repo=GitRepository(rep_path);
-    if (!repo.isClean())
+    if (rep_path.string()==".git") {}
+    else 
     {
-        config_ptr->addGitButton(repo);
-    }
-    if (!is_excluded(rep_path))
-    {
-        loopOverDirectory(rep_path); 
+        GitRepository repo=GitRepository(rep_path);
+        if (!repo.isClean())
+        {
+            config_ptr->addGitButton(repo);
+        }
+        if (!is_excluded(rep_path))
+        {
+            loopOverDirectory(rep_path); 
+        }
     }
 }
